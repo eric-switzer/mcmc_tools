@@ -49,10 +49,8 @@ def plot_2d_histo(x_data, y_data, xrange=None, yrange=None,
     # set up the plot geometry
     fig = plt.figure(1, figsize=(7,7))
 
-    #fig.subplots_adjust(hspace=0.001, wspace=0.001, left=0.10, bottom=0.095,
-    #                    top=0.975, right=0.98)
-    fig.subplots_adjust(hspace=0.001, wspace=0.001, left=0.20, bottom=0.095,
-                        top=0.975, right=0.95)
+    fig.subplots_adjust(hspace=0.001, wspace=0.001, left=0.10, bottom=0.095,
+                        top=0.975, right=0.98)
 
     gs = gridspec.GridSpec(2, 2, width_ratios=[1,4], height_ratios=[4,1])
 
@@ -107,6 +105,7 @@ def plot_2d_histo(x_data, y_data, xrange=None, yrange=None,
     # plot the marginalized x data
     plt.subplot(gs[3])
     plt.plot(x_vec, histo_x, '-', lw=3, color='black', ls='steps')
+    plt.ticklabel_format(style="sci", axis='x', scilimits=(1,2))
     plt.xticks(fontsize=16)
     plt.yticks([])
     plt.xlabel(r'$%s$' % xlabel, fontsize=24)
@@ -117,6 +116,7 @@ def plot_2d_histo(x_data, y_data, xrange=None, yrange=None,
     # plot the marginalized y data
     plt.subplot(gs[0])
     plt.plot(histo_y, y_vec, '-', lw=3, color='black', ls='steps')
+    plt.ticklabel_format(style="sci", axis='y', scilimits=(1,2))
     plt.yticks(fontsize=16)
     plt.xticks([])
     #plt.xlabel(r'$\cal L$', fontsize=24)
