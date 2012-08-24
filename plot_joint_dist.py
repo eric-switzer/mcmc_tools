@@ -49,7 +49,7 @@ def plot_2d_histo(x_data, y_data, xrange=None, yrange=None,
     # set up the plot geometry
     fig = plt.figure(1, figsize=(7,7))
 
-    fig.subplots_adjust(hspace=0.001, wspace=0.001, left=0.10, bottom=0.095,
+    fig.subplots_adjust(hspace=0.001, wspace=0.001, left=0.12, bottom=0.12,
                         top=0.975, right=0.98)
 
     gs = gridspec.GridSpec(2, 2, width_ratios=[1,4], height_ratios=[4,1])
@@ -130,7 +130,10 @@ def plot_2d_histo(x_data, y_data, xrange=None, yrange=None,
 
 def plot_chains(filename, nsigma=3.):
     np.set_printoptions(threshold='nan')
-    chain_data = h5py.File(filename, "r")
+    mcmc_data = h5py.File(filename, "r")
+    chain_data = mcmc_data['chain']
+    desc_data = mcmc_data['desc']
+
     print chain_data.keys(), "plot range (nsigma): ", nsigma
     #print chain_data['moment_1'].value 
 
@@ -147,10 +150,11 @@ def plot_chains(filename, nsigma=3.):
         xrange = [x_mean - nsigma * x_std, x_mean + nsigma * x_std]
         yrange = [y_mean - nsigma * y_std, y_mean + nsigma * y_std]
         plot_2d_histo(x_data, y_data, xrange=xrange, yrange=yrange,
-                      xlabel=pair[0], ylabel=pair[1], bins=50,
-                      filename=filename)
+                      xlabel=desc_data[pair[0]].value,
+                      ylabel=desc_data[pair[1]].value,
+                      bins=50, filename=filename)
 
-    chain_data.close()
+    mcmc_data.close()
 
 
 def main():

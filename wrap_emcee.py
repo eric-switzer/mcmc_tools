@@ -96,9 +96,14 @@ def call_mcmc(meas_means, meas_cov, default_params, fit_list, model_funcname,
     The list is ordered in the same way as the variables are packed into the
     parameter variable `theta` of the chain. The prior on parameters should
     follow the same ordering scheme.
+    `model_funcname` is the string naming the model function
     `theta_prior` and `icov_prior` use this to specify a mean and covariance
     for a prior on parameters; this overwrites information from the fit_list,
     which does not support covariance in the prior, but is more convenient.
+    `nwalkwers` is the number of walkers in emcee
+    `threads` is the number of threads to run emcee over
+    `outfile` is the output hd5; hd5 is used here (vs. pickle) for
+    cross-platform compatibility and performance.
     """
 
     # find the list of variables to run the chain over
@@ -187,8 +192,24 @@ def call_mcmc(meas_means, meas_cov, default_params, fit_list, model_funcname,
     print "Acceptance fraction: %g" % np.mean(sampler.acceptance_fraction)
 
     summaryfile = h5py.File(outfile, "w")
+    out_params = summaryfile.create_group("params")
+    out_chain = summaryfile.create_group("chain")
+    out_desc = summaryfile.create_group("desc")
+
     for kwarg_name in var_table:
-        summaryfile[kwarg_name] = sampler.flatchain[:, var_table[kwarg_name]]
+        out_chain[kwarg_name] = sampler.flatchain[:, var_table[kwarg_name]]
+        out_desc[kwarg_name] = var_desc[kwarg_name]
+
+    out_params['meas_means'] = meas_means
+    out_params['meas_cov'] = meas_cov
+    out_params['default_params'] = repr(default_params)
+    out_params['fit_list'] = repr(fit_list)
+    out_params['model_funcname'] = model_funcname
+    out_params['theta_prior'] = repr(theta_prior)
+    out_params['icov_prior'] = repr(icov_prior)
+    out_params['nwalkers'] = nwalkers
+    out_params['threads'] = threads
+
     summaryfile.close()
 
     # other output methods
