@@ -1,9 +1,9 @@
 r"""Repeat the analysis of Prokhorov and Colafrancesco 2012 using an MCMC"""
-import scipy.optimize as optimize
 import numpy as np
 import wrap_emcee
 import h5py
 # TODO: add nonlinear fitter an compare result to paper
+
 
 def challinor_lasenby_sz(x_freq):
     r"""Return the g_0 (x), g_1 (x) and g_2 (x) functions from
@@ -20,29 +20,31 @@ def challinor_lasenby_sz(x_freq):
     c_x4 = c_x ** 4.
     c_x5 = c_x ** 5.
 
-    sinh_xd2_sq = ((exp_x - 1.) / (2. * exp_xd2))**2.
+    sinh_xd2_sq = ((exp_x - 1.) / (2. * exp_xd2)) ** 2.
 
     prefactor = x_freq ** 4. * exp_x / (exp_x - 1.) ** 2.
 
-    g0 = c_x - 4.
-    g0 *= prefactor
+    sz_g0 = c_x - 4.
+    sz_g0 *= prefactor
 
-    g1 = -10. + 47. / 2. * c_x - 42. / 5. * c_x2 + 7. / 10. * c_x3
-    g1 += 7. / 5. * x_freq_sq / sinh_xd2_sq * (c_x - 3.)
-    g1 *= prefactor
+    sz_g1 = -10. + 47. / 2. * c_x - 42. / 5. * c_x2 + 7. / 10. * c_x3
+    sz_g1 += 7. / 5. * x_freq_sq / sinh_xd2_sq * (c_x - 3.)
+    sz_g1 *= prefactor
 
-    g2 = -15. / 2. + 1023. / 8. * c_x - 868 / 5. * c_x2 + 329. / 5. * c_x3
-    g2 += -44. / 5. * c_x4 + 11. / 30. * c_x5
-    g2_paren = -2604. + 3948 * c_x - 1452 * c_x2 + 143. * c_x3
-    g2 += x_freq_sq / 30. / sinh_xd2_sq * g2_paren
-    g2 += x_freq ** 4. / 60. / sinh_xd2_sq ** 2 * (-528. + 187. * c_x)
-    g2 *= prefactor
+    sz_g2 = -15. / 2. + 1023. / 8. * c_x - 868 / 5. * c_x2 + 329. / 5. * c_x3
+    sz_g2 += -44. / 5. * c_x4 + 11. / 30. * c_x5
+    sz_g2_paren = -2604. + 3948 * c_x - 1452 * c_x2 + 143. * c_x3
+    sz_g2 += x_freq_sq / 30. / sinh_xd2_sq * sz_g2_paren
+    sz_g2 += x_freq ** 4. / 60. / sinh_xd2_sq ** 2 * (-528. + 187. * c_x)
+    sz_g2 *= prefactor
 
-    return (g0, g1, g2)
+    return (sz_g0, sz_g1, sz_g2)
 
 
 def sz_model(bands=None, tau=None,
              moment_1=None, moment_2=None, moment_3=None):
+    r"""Combine the spectral functions from challinor_lasenby_sz() into the SZ
+    signal in a given model"""
 
     # if the result is non-physical, throw it out of the chain
     #print moment_1, moment_2, moment_3
@@ -52,11 +54,13 @@ def sz_model(bands=None, tau=None,
        (tau < 0.):
         return -np.inf
 
-    (g0, g1, g2) = challinor_lasenby_sz(bands)
-    return tau * (moment_1 * g0 + moment_2 * g1 + moment_3 * g2)
+    (sz_g0, sz_g1, sz_g2) = challinor_lasenby_sz(bands)
+    return tau * (moment_1 * sz_g0 + moment_2 * sz_g1 + moment_3 * sz_g2)
 
 
-def call_sz_fit(filename):
+def sz_estimation(filename):
+    r"""set up the parameters and run the chain"""
+
     # vector of central frequencies in x=h nu/k_B T_CMB
     meas_freq = np.array([150., 275., 600., 857.]) * 0.0176
     # measured flux and its errors in units of delta I (MJy/sr) / I_o
@@ -74,7 +78,6 @@ def call_sz_fit(filename):
     default_params['moment_1'] = 0.
     default_params['moment_2'] = 0.
     default_params['moment_3'] = 0.
-
 
     tau_fit = {"kwarg_name": "tau",
                "kwarg_desc": "\\tau",
@@ -105,28 +108,29 @@ def call_sz_fit(filename):
 
     #fit_list = [tau_fit, moment1_fit, moment2_fit, moment3_fit]
     fit_list = [moment1_fit, moment2_fit, moment3_fit]
-    # TODO: why are those below ~2 times smaller?:
     #fit_list = [tau_fit, moment1_fit, moment2_fit]
     #fit_list = [moment1_fit, moment2_fit]
 
-    chain_out = wrap_emcee.call_mcmc(meas_means, meas_cov, default_params,
-                                    fit_list, "relativistic_sz_fit.sz_model",
-                                    nwalkers=250, threads=15, verbose=False,
-                                    outfile=filename)
+    wrap_emcee.call_mcmc(meas_means, meas_cov, default_params,
+                         fit_list, "relativistic_sz_fit.sz_model",
+                         nwalkers=250, threads=15, verbose=False,
+                         outfile=filename)
 
 
-def analyze_sz_fit(filename):
+def analyze_sz(filename):
+    r"""Find the standard deviation of the temperature using the <T_e> and
+    <T_e^2> moments. (m_e c^2 = 511 keV)
+    """
     mcmc_data = h5py.File(filename, "r")
     chain_data = mcmc_data['chain']
 
-    sigma = 511. * np.sqrt( chain_data['moment_2'].value -
-                            chain_data['moment_1'].value ** 2.)
+    sigma = 511. * np.sqrt(chain_data['moment_2'].value -
+                           chain_data['moment_1'].value ** 2.)
 
     print np.mean(sigma[np.isfinite(sigma)]), np.std(sigma[np.isfinite(sigma)])
 
 
 np.seterr(all='ignore')
 if __name__ == '__main__':
-    filename = "prokhorov.hd5"
-    call_sz_fit(filename)
-    analyze_sz_fit(filename)
+    sz_estimation("prokhorov.hd5")
+    analyze_sz("prokhorov.hd5")

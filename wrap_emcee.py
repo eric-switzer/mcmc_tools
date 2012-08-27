@@ -79,7 +79,7 @@ def function_wrapper(funcname):
 
 def call_mcmc(meas_means, meas_cov, default_params, fit_list, model_funcname,
              theta_prior=None, icov_prior=None,
-             nwalkers=250, threads=1, verbose=False,
+             nwalkers=250, n_burn=100, n_run=1000, threads=1, verbose=False,
              outfile="save_chain.hd5"):
     r"""
     `meas_means` is the mean value of the measurement
@@ -101,6 +101,9 @@ def call_mcmc(meas_means, meas_cov, default_params, fit_list, model_funcname,
     for a prior on parameters; this overwrites information from the fit_list,
     which does not support covariance in the prior, but is more convenient.
     `nwalkwers` is the number of walkers in emcee
+    `n_burn` is the number of burn-in steps for the walker
+    `n_run` is the number of steps for each walking in the main run
+    The total number of samples is n_run * nwalkers
     `threads` is the number of threads to run emcee over
     `outfile` is the output hd5; hd5 is used here (vs. pickle) for
     cross-platform compatibility and performance.
@@ -142,18 +145,18 @@ def call_mcmc(meas_means, meas_cov, default_params, fit_list, model_funcname,
 
     print var_table
 
-    p0 = np.zeros((nwalkers, ndim))
+    initial_distribution = np.zeros((nwalkers, ndim))
     for var_item in var_table:
-        p0[:, var_table[var_item]] = walker_start[var_item]
+        initial_distribution[:, var_table[var_item]] = walker_start[var_item]
 
     meas_icov = np.linalg.inv(meas_cov)
-    params = { 'mu': meas_means,
-               'icov': meas_icov,
-               'model_func': function_wrapper(model_funcname),
-               'var_table': var_table,
-               'def_kwarg': default_params,
-               'verbose': verbose
-             }
+    params = {'mu': meas_means,
+              'icov': meas_icov,
+              'model_func': function_wrapper(model_funcname),
+              'var_table': var_table,
+              'def_kwarg': default_params,
+              'verbose': verbose
+              }
 
     # now determine the prior (if given)
     use_prior = False
@@ -167,7 +170,7 @@ def call_mcmc(meas_means, meas_cov, default_params, fit_list, model_funcname,
             use_prior = True
             ind = var_table[kwarg_name]
             theta_prior[ind] = prior_info[kwarg_name][0]
-            icov_prior[ind, ind] = 1. / prior_info[kwarg_name][1]**2.
+            icov_prior[ind, ind] = 1. / prior_info[kwarg_name][1] ** 2.
 
     if use_prior:
         print "using prior with mean = ", theta_prior
@@ -181,13 +184,13 @@ def call_mcmc(meas_means, meas_cov, default_params, fit_list, model_funcname,
                                     args=[params], threads=threads)
 
     print "priming sampler"
-    pos, prob, state = sampler.run_mcmc(p0, 100)
+    pos, prob, state = sampler.run_mcmc(initial_distribution, n_burn)
     sampler.reset()
 
     print "using mean position: ", np.mean(pos, axis=0)
 
     print "starting run..."
-    sampler.run_mcmc(pos, 1000)
+    sampler.run_mcmc(pos, n_run)
 
     print "Acceptance fraction: %g" % np.mean(sampler.acceptance_fraction)
 
