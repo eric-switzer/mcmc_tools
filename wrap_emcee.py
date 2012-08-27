@@ -195,6 +195,7 @@ def call_mcmc(meas_means, meas_cov, default_params, fit_list, model_funcname,
     out_params = summaryfile.create_group("params")
     out_chain = summaryfile.create_group("chain")
     out_desc = summaryfile.create_group("desc")
+    out_defaults = summaryfile.create_group("defaults")
 
     for kwarg_name in var_table:
         out_chain[kwarg_name] = sampler.flatchain[:, var_table[kwarg_name]]
@@ -202,13 +203,15 @@ def call_mcmc(meas_means, meas_cov, default_params, fit_list, model_funcname,
 
     out_params['meas_means'] = meas_means
     out_params['meas_cov'] = meas_cov
-    out_params['default_params'] = repr(default_params)
     out_params['fit_list'] = repr(fit_list)
     out_params['model_funcname'] = model_funcname
-    out_params['theta_prior'] = repr(theta_prior)
-    out_params['icov_prior'] = repr(icov_prior)
+    out_params['theta_prior'] = theta_prior
+    out_params['icov_prior'] = icov_prior
     out_params['nwalkers'] = nwalkers
     out_params['threads'] = threads
+
+    for param in default_params:
+        out_defaults[param] = default_params[param]
 
     summaryfile.close()
 

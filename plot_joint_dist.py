@@ -2,7 +2,6 @@
 r"""plot 2D histograms along combinations of variables"""
 import matplotlib
 matplotlib.use('Agg')
-import matplotlib.pyplot as pl
 import pickle
 import numpy as np
 import matplotlib.pyplot as plt
@@ -13,6 +12,7 @@ from scipy import optimize
 import itertools
 import scipy.ndimage as ndimage
 from optparse import OptionParser
+# TODO: marginal axis looks off-by-one
 
 
 def conf_level(histogram, clevels):
@@ -49,7 +49,7 @@ def plot_2d_histo(x_data, y_data, xrange=None, yrange=None,
     # set up the plot geometry
     fig = plt.figure(1, figsize=(7,7))
 
-    fig.subplots_adjust(hspace=0.001, wspace=0.001, left=0.12, bottom=0.12,
+    fig.subplots_adjust(hspace=0.001, wspace=0.001, left=0.15, bottom=0.12,
                         top=0.975, right=0.98)
 
     gs = gridspec.GridSpec(2, 2, width_ratios=[1,4], height_ratios=[4,1])
@@ -69,7 +69,8 @@ def plot_2d_histo(x_data, y_data, xrange=None, yrange=None,
                                                normed=False)
 
     histo_2d = np.transpose(histo_2d)
-    plt.pcolormesh(xedges, yedges, histo_2d, cmap=plt.cm.gray)
+    # gray, binary and jet are good options
+    plt.pcolormesh(xedges, yedges, histo_2d, cmap=plt.cm.jet)
     plt.xticks([])
     plt.yticks([])
 

@@ -110,7 +110,7 @@ def call_sz_fit(filename):
     #fit_list = [moment1_fit, moment2_fit]
 
     chain_out = wrap_emcee.call_mcmc(meas_means, meas_cov, default_params,
-                                    fit_list, "prokhorov_fit.sz_model",
+                                    fit_list, "relativistic_sz_fit.sz_model",
                                     nwalkers=250, threads=15, verbose=False,
                                     outfile=filename)
 
