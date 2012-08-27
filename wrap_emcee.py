@@ -10,6 +10,8 @@ chain). ERS 22Aug2012.
 import numpy as np
 import emcee
 import h5py
+import copy
+import multiprocessing
 
 
 def lnprob_generic(theta, params):
@@ -228,3 +230,73 @@ def call_mcmc(meas_means, meas_cov, default_params, fit_list, model_funcname,
     print "chain corrcoef: ", np.corrcoef(np.transpose(sampler.flatchain))
 
     return sampler.flatchain
+
+
+def run_model(params):
+    r"""Note: we need to pass in the model function to call along with the
+    parameters, but do not want to call the model with this keyword, so we need
+    to make a copy and delete the model_function keyword"""
+    model_function = params["model_function"]
+    to_pass = copy.deepcopy(params)
+    del to_pass["model_function"]
+    
+    return model_function(**to_pass)
+
+
+def evaluate_model(mcmc_data, obs_axis=None, obs_axis_name="bands",
+                   nsample=1000, verbose=True, threads=1):
+    r"""take an hd5 summary file and evaluate the model for each point in the
+    chain; find the excursion band for the function
+
+    `mcmc_data`: hd5 object for the chain data written by call_mcmc
+    `obs_axis`: new vector over which to evaluate the model at its params
+    This is useful if the data are at discrete points, but you would like to
+    plot the continuous function of the model (eval. on finer points).
+    `obs_axis_name`: name of the observed data axis in the params.
+    `nsample`: number of samples to take from the chain
+    """
+    mcmc_params = mcmc_data['params']
+    mcmc_chain = mcmc_data['chain']
+    mcmc_defaults = mcmc_data['defaults']
+    print "using model function: ", mcmc_params['model_funcname'].value
+    print "taking %d samples using %d threads" % (nsample, threads)
+
+    model_function = function_wrapper(mcmc_params['model_funcname'].value)
+
+    # remake the defaults into a dictionary
+    default_params = {}
+    for param in mcmc_defaults:
+        default_params[param] = mcmc_defaults[param].value
+
+    chain_params = copy.deepcopy(default_params)
+    if obs_axis is not None:
+        eval_model = np.zeros((obs_axis.shape[0], nsample))
+    else:
+        obs_axis = mcmc_defaults[obs_axis_name].value
+        eval_model = np.zeros((obs_axis.shape[0], nsample))
+
+    # it is much faster to extract the arrays and use a dictionary 
+    # than it is to pull the hd5 array and get its value
+    accel_access = {}
+    for param in mcmc_chain:
+        accel_access[param] = mcmc_chain[param].value
+
+    param_list = []
+    for index in range(nsample):
+        for param in mcmc_chain:
+            if param in mcmc_defaults.keys():
+                chain_params[param] = accel_access[param][index]
+
+        chain_params["model_function"] = model_function
+        chain_params[obs_axis_name] = obs_axis
+        param_list.append(copy.deepcopy(chain_params))
+
+    print "starting evaluation..."
+    pool = multiprocessing.Pool(processes=threads)
+    result = pool.map(run_model, param_list)
+    #result = run_model(param_list[0])  # for debugging
+
+    for (index, val) in zip(range(nsample), result):
+        eval_model[:, index] = result[index]
+
+    return eval_model
