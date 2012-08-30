@@ -114,14 +114,14 @@ def plot_2d_histo(x_data, y_data, x_range=None, y_range=None,
     plt.xlim(x_range)
     plt.ylim(y_range)
 
-    histo_x = np.histogram(x_data, bins=mbins, range=x_range, normed=True)[0]
-    histo_y = np.histogram(y_data, bins=mbins, range=y_range, normed=True)[0]
+    (histo_x, x_edges) = np.histogram(x_data, bins=mbins,
+                                      range=x_range, normed=True)
 
-    x_vec = np.linspace(x_range[0], x_range[1], num=len(histo_x),
-                        endpoint=True)
+    (histo_y, y_edges) = np.histogram(y_data, bins=mbins,
+                                      range=y_range, normed=True)
 
-    y_vec = np.linspace(y_range[0], y_range[1], num=len(histo_y),
-                        endpoint=True)
+    x_vec = 0.5 * (x_edges[1:] + x_edges[:-1])
+    y_vec = 0.5 * (y_edges[1:] + y_edges[:-1])
 
     # plot the marginalized x data
     plt.subplot(subplot_grid[3])
@@ -231,13 +231,13 @@ def plot_chains_triangle(chain_data, desc_data, plot_filename, nsigma=3.,
                 m_label = desc_data[var_list[x_ind]].value
                 m_range = find_range(m_data, nsigma=nsigma)
 
-                m_histo = np.histogram(m_data, bins=mbins,
-                                       range=m_range, normed=True)[0]
+                (m_histo, m_edges) = np.histogram(m_data, bins=mbins,
+                                       range=m_range, normed=True)
 
-                m_vec = np.linspace(m_range[0], m_range[1],
-                                    num=len(m_histo), endpoint=True)
+                m_vec = 0.5 * (m_edges[1:] + m_edges[:-1])
 
-                plt.plot(m_vec, m_histo, '-', lw=3, color='black', ls='steps')
+                #plt.plot(m_vec, m_histo, 'r--', lw=3, color='black', ls='steps')
+                plt.plot(m_vec, m_histo, '-', lw=3, color='black')
                 plt.ticklabel_format(style="sci", axis='x', scilimits=(1, 2))
                 plt.yticks([])
                 plt.xticks(fontsize=10)
@@ -256,7 +256,7 @@ def plot_chains_triangle(chain_data, desc_data, plot_filename, nsigma=3.,
                                                     normed=False)
 
                 # gray, binary and jet are good options
-                plt.pcolormesh(xedges, yedges, histo_2d, cmap=plt.cm.jet)
+                plt.pcolormesh(xedges, yedges, histo_2d, cmap=plt.cm.binary)
                 plt.xticks([])
                 plt.yticks([])
 
@@ -266,7 +266,7 @@ def plot_chains_triangle(chain_data, desc_data, plot_filename, nsigma=3.,
                 fmtdict = {}
                 for (clevel, conf_label) in zip(clevels, conf_labels):
                     linestyles.append('--')
-                    colors.append('green')
+                    colors.append('blue')
                     fmtdict[clevel] = conf_label
 
                 extent = [xedges[0], xedges[-1], yedges[0], yedges[-1]]
