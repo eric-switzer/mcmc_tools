@@ -49,8 +49,17 @@ def find_range(data_in, nsigma=3.):
     return [center - nsigma * delta, center + nsigma * delta]
 
 
-def plot_2d_histo(x_data, y_data, x_range=None, y_range=None,
-                  xlabel=None, ylabel=None, bins=25, mbins=50,
+def rescale_log(data_range, min_thresh=-2., max_thresh=3.):
+    r"""rescale data for scientific notation"""
+    largest = np.max(np.log10(np.abs(np.array(data_range))))
+    if largest > min_thresh and largest < max_thresh:
+        return None
+    else:
+        return int(largest)
+
+
+def plot_2d_histo(x_data, y_data, nsigma=3.,
+                  x_label=None, y_label=None, bins=25, mbins=50,
                   conf_contours=[0.5, 0.95],
                   conf_labels=["$50$", "$95$"],
                   plot_filename="plot_2d_histo.eps",
@@ -59,12 +68,32 @@ def plot_2d_histo(x_data, y_data, x_range=None, y_range=None,
     `x_data` and `y_data` are the data to bin
     `x_range` is the range list [xmin, xmax]
     `y_range` is the range list [ymin, ymax]
-    `xlabel` is the string that appears as the x label; LaTeX rendered?
-    `ylabel` is the string that appears as the x label; LaTeX rendered?
+    `x_label` is the string that appears as the x label; LaTeX rendered?
+    `y_label` is the string that appears as the x label; LaTeX rendered?
     `bins` is the number of bins to use along each axis
     `mbins` is the number of bins to use along the marginalized axes
+
+    ls="steps" also looks good in the marginalized dist
+    TODO: this currently rescales x,y_data (unsafe)
     """
-    # set up the plot geometry
+    x_range = find_range(x_data, nsigma=nsigma)
+    rescale_val = rescale_log(x_range)
+    if rescale_val:
+        print "rescaling %s by %d" % (x_label, rescale_val)
+        x_data /= 10. ** rescale_val
+        x_label += "\\cdot 10^{%d}" % -rescale_val
+
+        x_range = find_range(x_data, nsigma=nsigma)
+
+    y_range = find_range(y_data, nsigma=nsigma)
+    rescale_val = rescale_log(y_range)
+    if rescale_val:
+        print "rescaling %s by %d" % (y_label, rescale_val)
+        y_data /= 10. ** rescale_val
+        y_label += "\\cdot 10^{%d}" % -rescale_val
+
+        y_range = find_range(y_data, nsigma=nsigma)
+
     fig = plt.figure(1, figsize=(7, 7))
 
     fig.subplots_adjust(hspace=0.001, wspace=0.001, left=0.15, bottom=0.12,
@@ -90,7 +119,7 @@ def plot_2d_histo(x_data, y_data, x_range=None, y_range=None,
 
     histo_2d = np.transpose(histo_2d)
     # gray, binary and jet are good options
-    plt.pcolormesh(xedges, yedges, histo_2d, cmap=plt.cm.jet)
+    plt.pcolormesh(xedges, yedges, histo_2d, cmap=plt.cm.binary)
     plt.xticks([])
     plt.yticks([])
 
@@ -101,7 +130,7 @@ def plot_2d_histo(x_data, y_data, x_range=None, y_range=None,
     fmtdict = {}
     for (clevel, conf_label) in zip(clevels, conf_labels):
         linestyles.append('--')
-        colors.append('green')
+        colors.append('blue')
         fmtdict[clevel] = conf_label
 
     extent = [xedges[0], xedges[-1], yedges[0], yedges[-1]]
@@ -114,34 +143,34 @@ def plot_2d_histo(x_data, y_data, x_range=None, y_range=None,
     plt.xlim(x_range)
     plt.ylim(y_range)
 
-    (histo_x, x_edges) = np.histogram(x_data, bins=mbins,
+    (histo_x, xedges) = np.histogram(x_data, bins=mbins,
                                       range=x_range, normed=True)
 
-    (histo_y, y_edges) = np.histogram(y_data, bins=mbins,
+    (histo_y, yedges) = np.histogram(y_data, bins=mbins,
                                       range=y_range, normed=True)
 
-    x_vec = 0.5 * (x_edges[1:] + x_edges[:-1])
-    y_vec = 0.5 * (y_edges[1:] + y_edges[:-1])
+    x_vec = 0.5 * (xedges[1:] + xedges[:-1])
+    y_vec = 0.5 * (yedges[1:] + yedges[:-1])
 
     # plot the marginalized x data
     plt.subplot(subplot_grid[3])
-    plt.plot(x_vec, histo_x, '-', lw=3, color='black', ls='steps')
-    plt.ticklabel_format(style="sci", axis='x', scilimits=(1, 2))
+    plt.plot(x_vec, histo_x, '-', lw=3, color='black')
+    #plt.ticklabel_format(style="sci", axis='x', scilimits=(1, 3))
     plt.xticks(fontsize=16)
     plt.yticks([])
-    plt.xlabel(r'$%s$' % xlabel, fontsize=24)
+    plt.xlabel(r'$%s$' % x_label, fontsize=24)
     #plt.ylabel(r'$\cal L$', fontsize=24)
     plt.xlim(x_range)
     plt.ylim(0.0, 1.1 * np.max(histo_x))
 
     # plot the marginalized y data
     plt.subplot(subplot_grid[0])
-    plt.plot(histo_y, y_vec, '-', lw=3, color='black', ls='steps')
-    plt.ticklabel_format(style="sci", axis='y', scilimits=(1, 2))
+    plt.plot(histo_y, y_vec, '-', lw=3, color='black')
+    #plt.ticklabel_format(style="sci", axis='y', scilimits=(1, 3))
     plt.yticks(fontsize=16)
     plt.xticks([])
     #plt.xlabel(r'$\cal L$', fontsize=24)
-    plt.ylabel(r'$%s$' % ylabel, fontsize=24)
+    plt.ylabel(r'$%s$' % y_label, fontsize=24)
     plt.xlim(0.0, 1.1 * np.max(histo_y))
     plt.ylim(y_range)
 
@@ -179,19 +208,15 @@ def plot_chains(filename, nsigma=3., separate=False,
             root = output
 
         for pair in itertools.combinations(chain_data, 2):
-            x_data = chain_data[pair[0]].value
-            y_data = chain_data[pair[1]].value
-            x_range = find_range(x_data, nsigma=nsigma)
-            y_range = find_range(y_data, nsigma=nsigma)
-
             plot_filename = "%s/%s_%s_with_%s.%s" % \
                             (root, basename, pair[0], pair[1], file_format)
 
             print plot_filename
 
-            plot_2d_histo(x_data, y_data, x_range=x_range, y_range=y_range,
-                          xlabel=desc_data[pair[0]].value,
-                          ylabel=desc_data[pair[1]].value,
+            plot_2d_histo(copy.deepcopy(chain_data[pair[0]].value),
+                          copy.deepcopy(chain_data[pair[1]].value),
+                          x_label=copy.deepcopy(desc_data[pair[0]].value),
+                          y_label=copy.deepcopy(desc_data[pair[1]].value),
                           bins=50, plot_filename=plot_filename,
                           file_format=file_format)
 
@@ -227,8 +252,16 @@ def plot_chains_triangle(chain_data, desc_data, plot_filename, nsigma=3.,
 
             # if the plot is along the diagonal, plot marginalized
             if x_ind == y_ind:
-                m_data = chain_data[var_list[x_ind]].value
+                m_data = copy.deepcopy(chain_data[var_list[x_ind]].value)
                 m_label = desc_data[var_list[x_ind]].value
+
+                m_range = find_range(m_data, nsigma=nsigma)
+                rescale_val = rescale_log(m_range)
+                if rescale_val:
+                    print "rescaling %d by %d" % (x_ind, rescale_val)
+                    m_data /= 10. ** rescale_val
+                    m_label += "\\cdot 10^{%d}" % -rescale_val
+
                 m_range = find_range(m_data, nsigma=nsigma)
 
                 (m_histo, m_edges) = np.histogram(m_data, bins=mbins,
@@ -236,9 +269,9 @@ def plot_chains_triangle(chain_data, desc_data, plot_filename, nsigma=3.,
 
                 m_vec = 0.5 * (m_edges[1:] + m_edges[:-1])
 
-                #plt.plot(m_vec, m_histo, 'r--', lw=3, color='black', ls='steps')
+                # can also add ls="steps"
                 plt.plot(m_vec, m_histo, '-', lw=3, color='black')
-                plt.ticklabel_format(style="sci", axis='x', scilimits=(1, 2))
+                #plt.ticklabel_format(style="sci", axis='x', scilimits=(1, 3))
                 plt.yticks([])
                 plt.xticks(fontsize=10)
                 plt.xlabel(r'$%s$' % m_label, fontsize=20)
