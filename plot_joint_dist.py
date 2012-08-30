@@ -1,5 +1,8 @@
 #!/usr/bin/env python
-r"""plot 2D histograms along combinations of variables"""
+r"""plot 2D histograms along combinations of variables
+ERS Aug 2012
+"""
+import os
 import matplotlib
 matplotlib.use('Agg')
 import numpy as np
@@ -11,7 +14,10 @@ from scipy import optimize
 import itertools
 import scipy.ndimage as ndimage
 from optparse import OptionParser
+# TODO: make binning, conf contours come from command line
 # TODO: marginal axis looks off-by-one
+# TODO: variable confidence contour color
+# TODO: let histogram return the bin axis
 
 
 def conf_level(histogram, clevels):
@@ -34,11 +40,21 @@ def conf_level(histogram, clevels):
     return retval
 
 
+def find_range(data_in, nsigma=3.):
+    r"""helper to find ranges of plots"""
+    # TODO: make this more robust to outliers
+    center = np.mean(data_in)
+    delta = np.std(data_in)
+
+    return [center - nsigma * delta, center + nsigma * delta]
+
+
 def plot_2d_histo(x_data, y_data, x_range=None, y_range=None,
-                  xlabel=None, ylabel=None, bins=25, hbins=50,
+                  xlabel=None, ylabel=None, bins=25, mbins=50,
                   conf_contours=[0.5, 0.95],
                   conf_labels=["$50$", "$95$"],
-                  filename="plot_2d_histo.eps"):
+                  plot_filename="plot_2d_histo.eps",
+                  file_format="eps"):
     r"""Make the 2d histogram and plot it
     `x_data` and `y_data` are the data to bin
     `x_range` is the range list [xmin, xmax]
@@ -46,7 +62,7 @@ def plot_2d_histo(x_data, y_data, x_range=None, y_range=None,
     `xlabel` is the string that appears as the x label; LaTeX rendered?
     `ylabel` is the string that appears as the x label; LaTeX rendered?
     `bins` is the number of bins to use along each axis
-    `hbins` is the number of bins to use along the marginalized axes
+    `mbins` is the number of bins to use along the marginalized axes
     """
     # set up the plot geometry
     fig = plt.figure(1, figsize=(7, 7))
@@ -98,14 +114,14 @@ def plot_2d_histo(x_data, y_data, x_range=None, y_range=None,
     plt.xlim(x_range)
     plt.ylim(y_range)
 
-    histo_x = np.histogram(x_data, bins=hbins, range=x_range, normed=True)[0]
-    histo_y = np.histogram(y_data, bins=hbins, range=y_range, normed=True)[0]
-    # Restore positions lost by binning.
-    x_vec = x_range[0] + (x_range[1] - x_range[0]) * \
-             np.array(range(0, len(histo_x))) / float(len(histo_x) - 1)
+    histo_x = np.histogram(x_data, bins=mbins, range=x_range, normed=True)[0]
+    histo_y = np.histogram(y_data, bins=mbins, range=y_range, normed=True)[0]
 
-    y_vec = y_range[0] + (y_range[1] - y_range[0]) * \
-             np.array(range(0, len(histo_y))) / float(len(histo_y) - 1)
+    x_vec = np.linspace(x_range[0], x_range[1], num=len(histo_x),
+                        endpoint=True)
+
+    y_vec = np.linspace(y_range[0], y_range[1], num=len(histo_y),
+                        endpoint=True)
 
     # plot the marginalized x data
     plt.subplot(subplot_grid[3])
@@ -129,38 +145,144 @@ def plot_2d_histo(x_data, y_data, x_range=None, y_range=None,
     plt.xlim(0.0, 1.1 * np.max(histo_y))
     plt.ylim(y_range)
 
-    plt.savefig(filename, format="eps")
+    plt.savefig(plot_filename, format=file_format)
     #plt.show()
 
 
-def plot_chains(filename, nsigma=3.):
+def plot_chains(filename, nsigma=3., separate=False,
+                output=None, file_format="eps"):
     r"""Given an hd5 file written by wrap_emcee, plot the joint distribution
     of all the parameters in the output chains"""
     np.set_printoptions(threshold='nan')
     mcmc_data = h5py.File(filename, "r")
     chain_data = mcmc_data['chain']
     desc_data = mcmc_data['desc']
-
     print chain_data.keys(), "plot range (nsigma): ", nsigma
-    #print chain_data['moment_1'].value
+    basename = os.path.splitext(filename)[0]
 
-    for pair in itertools.combinations(chain_data, 2):
-        x_data = chain_data[pair[0]].value
-        y_data = chain_data[pair[1]].value
-        filename = "joint_dist_%s_with_%s.eps" % (pair[0], pair[1])
-        print filename
-        (x_mean, y_mean) = (np.mean(x_data), np.mean(y_data))
-        (x_std, y_std) = (np.std(x_data), np.std(y_data))
+    if not separate:
+        if output is None:
+            plot_filename = "%s.%s" % (basename, file_format)
+        else:
+            plot_filename = output
 
-        #print (x_mean, y_mean), (x_std, y_std)
-        x_range = [x_mean - nsigma * x_std, x_mean + nsigma * x_std]
-        y_range = [y_mean - nsigma * y_std, y_mean + nsigma * y_std]
-        plot_2d_histo(x_data, y_data, x_range=x_range, y_range=y_range,
-                      xlabel=desc_data[pair[0]].value,
-                      ylabel=desc_data[pair[1]].value,
-                      bins=50, filename=filename)
+        plot_chains_triangle(chain_data, desc_data, plot_filename, nsigma=3.,
+                             var_list=None, conf_contours=[0.5, 0.95],
+                             conf_labels=["$50$", "$95$"],
+                             size_multiplier=3., bins=50, mbins=50,
+                             file_format=file_format)
+
+    else:
+        if output is None:
+            root = "./"
+        else:
+            root = output
+
+        for pair in itertools.combinations(chain_data, 2):
+            x_data = chain_data[pair[0]].value
+            y_data = chain_data[pair[1]].value
+            x_range = find_range(x_data, nsigma=nsigma)
+            y_range = find_range(y_data, nsigma=nsigma)
+
+            plot_filename = "%s/%s_%s_with_%s.%s" % \
+                            (root, basename, pair[0], pair[1], file_format)
+
+            print plot_filename
+
+            plot_2d_histo(x_data, y_data, x_range=x_range, y_range=y_range,
+                          xlabel=desc_data[pair[0]].value,
+                          ylabel=desc_data[pair[1]].value,
+                          bins=50, plot_filename=plot_filename,
+                          file_format=file_format)
 
     mcmc_data.close()
+
+
+def plot_chains_triangle(chain_data, desc_data, plot_filename, nsigma=3.,
+                         var_list=None, conf_contours=[0.5, 0.95],
+                         conf_labels=["$50$", "$95$"], file_format="eps",
+                         size_multiplier=3., bins=50, mbins=50):
+    r"""plot a triangle of joint variable distributions (J. Chluba, ERS)
+    `var_list` is an optional list of variables specifying order/subsets
+    `size_multiplier` * number of variables = size of plot
+    """
+    print "making a joint param triangle plot: ", plot_filename
+
+    if var_list is None:
+        # can not iterate over keys in a grid, so make a list
+        var_list = chain_data.keys()
+
+    nvars = len(var_list)
+    print "number of vars = ", nvars
+
+    plot_size = nvars * size_multiplier
+    fig = plt.figure(1, figsize=(plot_size, plot_size))
+    fig.subplots_adjust(hspace=0.02, wspace=0.02, left=0.02, bottom=0.05,
+                        top=0.98, right=0.98)
+
+    for x_ind in range(0, nvars):
+        for y_ind in range(x_ind, nvars):
+            print "plotting section: ", y_ind, x_ind
+            plt.subplot2grid((nvars, nvars), (x_ind, y_ind))
+
+            # if the plot is along the diagonal, plot marginalized
+            if x_ind == y_ind:
+                m_data = chain_data[var_list[x_ind]].value
+                m_label = desc_data[var_list[x_ind]].value
+                m_range = find_range(m_data, nsigma=nsigma)
+
+                m_histo = np.histogram(m_data, bins=mbins,
+                                       range=m_range, normed=True)[0]
+
+                m_vec = np.linspace(m_range[0], m_range[1],
+                                    num=len(m_histo), endpoint=True)
+
+                plt.plot(m_vec, m_histo, '-', lw=3, color='black', ls='steps')
+                plt.ticklabel_format(style="sci", axis='x', scilimits=(1, 2))
+                plt.yticks([])
+                plt.xticks(fontsize=10)
+                plt.xlabel(r'$%s$' % m_label, fontsize=20)
+                plt.xlim(m_range)
+                plt.ylim(0.0, 1.1 * np.max(m_histo))
+            else:  # plot the joint distribution
+                x_data = chain_data[var_list[x_ind]].value
+                x_range = find_range(x_data, nsigma=nsigma)
+                y_data = chain_data[var_list[y_ind]].value
+                y_range = find_range(y_data, nsigma=nsigma)
+
+                histo_2d, xedges, yedges = np.histogram2d(x_data, y_data,
+                                                    bins=[bins, bins],
+                                                    range=[x_range, y_range],
+                                                    normed=False)
+
+                # gray, binary and jet are good options
+                plt.pcolormesh(xedges, yedges, histo_2d, cmap=plt.cm.jet)
+                plt.xticks([])
+                plt.yticks([])
+
+                clevels = conf_level(histo_2d, conf_contours)
+                linestyles = []
+                colors = []
+                fmtdict = {}
+                for (clevel, conf_label) in zip(clevels, conf_labels):
+                    linestyles.append('--')
+                    colors.append('green')
+                    fmtdict[clevel] = conf_label
+
+                extent = [xedges[0], xedges[-1], yedges[0], yedges[-1]]
+                histo_2d_smooth = ndimage.gaussian_filter(histo_2d, sigma=1.,
+                                                          order=0)
+
+                contours = plt.contour(histo_2d_smooth, extent=extent,
+                                       levels=clevels, linestyles=linestyles,
+                                       colors=colors, linewidths=2)
+
+                plt.clabel(contours, fmt=fmtdict, inline=True, fontsize=14)
+
+                plt.xlim(x_range)
+                plt.ylim(y_range)
+
+    plt.savefig(plot_filename, format=file_format)
 
 
 def main():
@@ -168,11 +290,29 @@ def main():
     parser = OptionParser(usage="usage: %prog [options] filename",
                           version="%prog 1.0")
 
-    parser.add_option("-s", "--nsigma",
+    parser.add_option("-n", "--nsigma",
                       action="store",
                       dest="nsigma",
                       default=3.,
                       help="Range (in sigma) of axes")
+
+    parser.add_option("-o", "--output",
+                      action="store",
+                      dest="output",
+                      default=None,
+                      help="Filename or output root (for -s)")
+
+    parser.add_option("-f", "--format",
+                      action="store",
+                      dest="file_format",
+                      default=None,
+                      help="File format")
+
+    parser.add_option("-s", "--separate",
+                      action="store_true",
+                      dest="separate",
+                      default=False,
+                      help="make separate plots for each joint var")
 
     (options, args) = parser.parse_args()
     optdict = vars(options)
@@ -181,8 +321,7 @@ def main():
         parser.error("wrong number of arguments")
 
     #print options, args
-
-    plot_chains(args[0], nsigma=optdict['nsigma'])
+    plot_chains(args[0], **optdict)
 
 
 if __name__ == '__main__':
