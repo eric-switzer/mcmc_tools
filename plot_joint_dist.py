@@ -46,7 +46,16 @@ def find_range(data_in, nsigma=3.):
     center = np.mean(data_in)
     delta = np.std(data_in)
 
-    return [center - nsigma * delta, center + nsigma * delta]
+    sigmaleft = center - nsigma * delta
+    sigmaright = center + nsigma * delta
+
+    # let the plot range only extend to where data exist
+    # leaving a 30% gap
+    gap = 0.3 * delta
+    left = max([sigmaleft, min(data_in) - gap])
+    right = min([sigmaright, max(data_in) + gap])
+
+    return [left, right]
 
 
 def rescale_log(data_range, min_thresh=-2., max_thresh=3.):
@@ -152,13 +161,17 @@ def plot_2d_histo(x_data, y_data, nsigma=3.,
     x_vec = 0.5 * (xedges[1:] + xedges[:-1])
     y_vec = 0.5 * (yedges[1:] + yedges[:-1])
 
+    # interpret ~ as a divider between variable name and units
+    x_label_sp = "$%s$" % "$ $".join(x_label.split("~"))
+    y_label_sp = "$%s$" % "$ $".join(y_label.split("~"))
+
     # plot the marginalized x data
     plt.subplot(subplot_grid[3])
     plt.plot(x_vec, histo_x, '-', lw=3, color='black')
     #plt.ticklabel_format(style="sci", axis='x', scilimits=(1, 3))
     plt.xticks(fontsize=16)
     plt.yticks([])
-    plt.xlabel(r'$%s$' % x_label, fontsize=24)
+    plt.xlabel(x_label_sp, fontsize=24)
     #plt.ylabel(r'$\cal L$', fontsize=24)
     plt.xlim(x_range)
     plt.ylim(0.0, 1.1 * np.max(histo_x))
@@ -170,7 +183,7 @@ def plot_2d_histo(x_data, y_data, nsigma=3.,
     plt.yticks(fontsize=16)
     plt.xticks([])
     #plt.xlabel(r'$\cal L$', fontsize=24)
-    plt.ylabel(r'$%s$' % y_label, fontsize=24)
+    plt.ylabel(y_label_sp, fontsize=24)
     plt.xlim(0.0, 1.1 * np.max(histo_y))
     plt.ylim(y_range)
 
@@ -254,6 +267,8 @@ def plot_chains_triangle(chain_data, desc_data, plot_filename, nsigma=3.,
             if x_ind == y_ind:
                 m_data = copy.deepcopy(chain_data[var_list[x_ind]].value)
                 m_label = desc_data[var_list[x_ind]].value
+                m_label_sp = "$%s$" % "$ $".join(m_label.split("~"))
+                print m_label_sp
 
                 m_range = find_range(m_data, nsigma=nsigma)
                 rescale_val = rescale_log(m_range)
@@ -274,7 +289,7 @@ def plot_chains_triangle(chain_data, desc_data, plot_filename, nsigma=3.,
                 #plt.ticklabel_format(style="sci", axis='x', scilimits=(1, 3))
                 plt.yticks([])
                 plt.xticks(fontsize=10)
-                plt.xlabel(r'$%s$' % m_label, fontsize=20)
+                plt.xlabel(m_label_sp, fontsize=20)
                 plt.xlim(m_range)
                 plt.ylim(0.0, 1.1 * np.max(m_histo))
             else:  # plot the joint distribution
@@ -338,7 +353,7 @@ def main():
     parser.add_option("-f", "--format",
                       action="store",
                       dest="file_format",
-                      default=None,
+                      default="png",
                       help="File format")
 
     parser.add_option("-s", "--separate",
