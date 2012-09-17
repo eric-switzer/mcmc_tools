@@ -226,6 +226,10 @@ def call_mcmc(meas_means, meas_cov, default_params, fit_list, model_funcname,
 
     print "chain mean: ", np.mean(sampler.flatchain, axis=0)
     print "chain std: ", np.std(sampler.flatchain, axis=0)
+    percentile_list = [5., 16., 50., 84., 95.]
+    for ptile in percentile_list:
+        print "ptile", ptile, np.percentile(sampler.flatchain, ptile, axis=0)
+
     print "chain cov: ", np.cov(np.transpose(sampler.flatchain))
     print "chain corrcoef: ", np.corrcoef(np.transpose(sampler.flatchain))
 
