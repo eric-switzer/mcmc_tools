@@ -267,15 +267,16 @@ def plot_chains_triangle(chain_data, desc_data, plot_filename, nsigma=3.,
             if x_ind == y_ind:
                 m_data = copy.deepcopy(chain_data[var_list[x_ind]].value)
                 m_label = desc_data[var_list[x_ind]].value
-                m_label_sp = "$%s$" % "$ $".join(m_label.split("~"))
-                print m_label_sp
-
                 m_range = find_range(m_data, nsigma=nsigma)
+
                 rescale_val = rescale_log(m_range)
                 if rescale_val:
                     print "rescaling %d by %d" % (x_ind, rescale_val)
                     m_data /= 10. ** rescale_val
                     m_label += "\\cdot 10^{%d}" % -rescale_val
+
+                m_label_sp = "$%s$" % "$ $".join(m_label.split("~"))
+                print m_label_sp
 
                 m_range = find_range(m_data, nsigma=nsigma)
 

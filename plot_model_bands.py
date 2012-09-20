@@ -12,7 +12,7 @@ import wrap_emcee
 
 def plot_best_fit(hd5_file_list, plot_filename="best_fit.png",
                   obs_axis_name="bands", format="png",
-                  xlabel="x", ylabel="y",
+                  xlabel="x", ylabel="y", nobands=False,
                   xmin=0.1, xmax=17., nx=300, nsample=10000, threads=20):
     r"""Draw `nsample` parameters from a chain and evaluate the model function
     there, find the mean and stdev of the model over this chain, plot.
@@ -54,11 +54,14 @@ def plot_best_fit(hd5_file_list, plot_filename="best_fit.png",
     plt.ylabel(r"$%s$" % ylabel, fontsize=18)
 
     for (dmean, dstd, color) in zip(model_means, model_stdevs, colors):
-        plt.fill_between(obs_axis, dmean - dstd,
-                         dmean + dstd, facecolor=color,
-                         interpolate=True, alpha=0.5, linewidth=0)
+        if not nobands:
+            plt.fill_between(obs_axis, dmean - dstd,
+                             dmean + dstd, facecolor=color,
+                             interpolate=True, alpha=0.5, linewidth=0)
 
-        plt.plot(obs_axis, dmean, linestyle="-", linewidth=1, color="black")
+            plt.plot(obs_axis, dmean, linestyle="-", linewidth=1, color="black")
+        else:
+            plt.plot(obs_axis, dmean, linestyle="-", linewidth=2, color=color)
 
     # assume that all given chains are based on the same data
     print meas_means[0], np.diag(meas_stdevs[0])
@@ -139,6 +142,12 @@ def main():
                       type="int",
                       default=20,
                       help="Number of threads to use in model eval.")
+
+    parser.add_option("-b", "--nobands",
+                      action="store_true",
+                      dest="nobands",
+                      default=False,
+                      help="Do not show error bands")
 
     (options, args) = parser.parse_args()
     optdict = vars(options)
