@@ -68,6 +68,18 @@ def nearest_vector_1d(samples):
     return outvec
 
 
+def weighted_cov(samples, multiplicity=None):
+    r"""similar to numpy.cov except permitting multiplicity weights"""
+    dvec = samples - np.mean(samples, axis=0)
+    if multiplicity is None:
+        retcov = np.dot(dvec.T, dvec) / float(dvec.shape[0] - 1.)
+    else:
+        retcov = np.dot(dvec.T * multiplicity, dvec)
+        retcov /= np.sum(multiplicity)
+
+    return retcov
+
+
 def sample_entropy_nn(samples, multiplicity=None):
     r"""find the entropy of the sample using nearest neighbors
     Citation: Nearest Neighbor Estimates of Entropy
@@ -102,6 +114,11 @@ def sample_entropy_nn(samples, multiplicity=None):
     else:
         nn_dist = nearest_1dfast(samples)
 
+    # find the empirical covariance to get the entropy in an ellipsoidal
+    # approximation to the likelihood
+    empcov = weighted_cov(samples, multiplicity=multiplicity)
+    ellip_ent = analytic_entropy_normal(empcov)
+
     # now pare out values at zero (duplicates in chain)
     whnzero = np.where(nn_dist > 0.)
     nn_dist = nn_dist[whnzero]
@@ -118,6 +135,8 @@ def sample_entropy_nn(samples, multiplicity=None):
     result = ndim * np.sum(ln_nn_dist) / nsamp
     result += np.log(factor) + np.log(nsamp - 1.)
     result += 0.5772156649
+
+    print "full, covariance approx: ", result, ellip_ent
 
     return result
 
