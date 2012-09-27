@@ -72,7 +72,6 @@ def plot_best_fit(hd5_file_list, plot_filename="best_fit.png",
     plt.savefig(plot_filename, format=format)
 
 
-
 def main():
     r"""parse arguments to plot_best_fit from the command line"""
     parser = OptionParser(usage="usage: %prog [options] filename",
@@ -121,7 +120,7 @@ def main():
                       type="float",
                       default=17.,
                       help="Maximum x to plot")
-    
+
     parser.add_option("-n", "--nx",
                       action="store",
                       dest="nx",

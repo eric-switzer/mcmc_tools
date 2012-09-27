@@ -1,8 +1,11 @@
+#!/usr/bin/env python
 r"""Various tools to calculate the entropy either from covariance or samples"""
 import numpy as np
 import scipy.special
 from scipy import spatial
 import math
+from optparse import OptionParser
+import ast
 
 
 def safe_det_dim(matrix_in):
@@ -65,7 +68,7 @@ def nearest_vector_1d(samples):
     return outvec
 
 
-def sample_entropy_nn(samples):
+def sample_entropy_nn(samples, multiplicity=None):
     r"""find the entropy of the sample using nearest neighbors
     Citation: Nearest Neighbor Estimates of Entropy
     Singh et al. Am. J. Mathmetical and Management Science
@@ -87,7 +90,6 @@ def sample_entropy_nn(samples):
     >>> np.testing.assert_almost_equal(result, 1., decimal=2)
 
     """
-    nsamp = float(samples.shape[0])
     try:
         ndim = float(samples.shape[1])
     except IndexError:
@@ -100,14 +102,51 @@ def sample_entropy_nn(samples):
     else:
         nn_dist = nearest_1dfast(samples)
 
+    # now pare out values at zero (duplicates in chain)
+    whnzero = np.where(nn_dist > 0.)
+    nn_dist = nn_dist[whnzero]
+
     ln_nn_dist = np.log(nn_dist)
+    nsamp = float(len(nn_dist))
+
+    if multiplicity is not None:
+        multiplicity = multiplicity[whnzero]
+        nsamp = float(np.sum(multiplicity))
+        ln_nn_dist *= multiplicity
 
     factor = math.pi ** (ndim / 2.) / scipy.special.gamma(ndim / 2. + 1)
     result = ndim * np.sum(ln_nn_dist) / nsamp
-    result += np.log(factor) + np.log(float(nsamp - 1))
+    result += np.log(factor) + np.log(nsamp - 1.)
     result += 0.5772156649
 
     return result
+
+
+def sample_entropy_file(filename, param_cols=None, mult_col=None):
+    r"""Calculate the entropy of chains read from a file
+    `param_cols` is the set of parameters column numbers to estimate over
+    `mult_col` is an optional column giving chain multiplicies
+    """
+    in_file = open(filename, "r")
+    all_data = np.genfromtxt(in_file, dtype="float")
+    print "data dimensions: ", all_data.shape
+
+    multiplicity = None
+    if mult_col:
+        multiplicity = all_data[:, mult_col].T
+        print "multiplicity: ", multiplicity
+
+    if param_cols:
+        colarr = np.array(ast.literal_eval(param_cols))
+        print "using parameter columns: ", colarr
+        samples = all_data[:, colarr]
+        if len(colarr) == 1:
+            samples = samples[:, 0]
+    else:
+        samples = all_data
+
+    print "using samples: ", samples
+    print "entropy: ", sample_entropy_nn(samples, multiplicity=multiplicity)
 
 
 def mcintegral_entropy(likelihood):
@@ -130,10 +169,37 @@ def mcintegral_entropy(likelihood):
     return (1. / norm) * np.sum(-np.log(likelihood))
 
 
-if __name__ == "__main__":
-    import doctest
+def main():
+    r"""call sample_entropy_file on an output chain file"""
+    parser = OptionParser(usage="usage: %prog [options] filename",
+                          version="%prog 1.0")
 
+    parser.add_option("-c", "--cols",
+                      action="store",
+                      dest="param_cols",
+                      default=None,
+                      help="Column numbers for parameters")
+
+    parser.add_option("-m", "--mult",
+                      action="store",
+                      dest="mult_col",
+                      default=None,
+                      help="Column number of multiplicity")
+
+    (options, args) = parser.parse_args()
+    optdict = vars(options)
+
+    if len(args) != 1:
+        parser.error("wrong number of arguments")
+
+    sample_entropy_file(args[0], **optdict)
+
+
+if __name__ == "__main__":
+    #import doctest
     # run some tests
-    OPTIONFLAGS = (doctest.ELLIPSIS |
-                   doctest.NORMALIZE_WHITESPACE)
-    doctest.testmod(optionflags=OPTIONFLAGS)
+    #OPTIONFLAGS = (doctest.ELLIPSIS |
+    #               doctest.NORMALIZE_WHITESPACE)
+    #doctest.testmod(optionflags=OPTIONFLAGS)
+
+    main()
