@@ -125,8 +125,7 @@ def mcintegral_entropy(likelihood):
     >>> result /= analytic_entropy_normal(covmat)
     >>> np.testing.assert_almost_equal(result, 1., decimal=2)
     """
-    nsamp = float(likelihood.shape[0])
-    norm = float(nsamp)
+    norm = float(likelihood.shape[0])
     # MC integrand is -p ln p, so -p ln p / p
     return (1. / norm) * np.sum(-np.log(likelihood))
 
