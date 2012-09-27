@@ -110,7 +110,7 @@ def sample_entropy_nn(samples):
     return result
 
 
-def mcintegral_entropy(samples, likelihood):
+def mcintegral_entropy(likelihood):
     r"""
     Given an appropriately-normalized likelihood, find the entropy
 
@@ -121,11 +121,11 @@ def mcintegral_entropy(samples, likelihood):
 
     >>> samples = np.random.multivariate_normal(mean, covmat, nsamp)
     >>> likelihood = multivariate_normal_distribution(mean, covmat, samples)
-    >>> result = mcintegral_entropy(samples, likelihood)
+    >>> result = mcintegral_entropy(likelihood)
     >>> result /= analytic_entropy_normal(covmat)
     >>> np.testing.assert_almost_equal(result, 1., decimal=2)
     """
-    nsamp = float(samples.shape[0])
+    nsamp = float(likelihood.shape[0])
     norm = float(nsamp)
     # MC integrand is -p ln p, so -p ln p / p
     return (1. / norm) * np.sum(-np.log(likelihood))
