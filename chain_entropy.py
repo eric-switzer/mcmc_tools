@@ -5,18 +5,30 @@ from scipy import spatial
 import math
 
 
+def safe_det_dim(matrix_in):
+    r"""Return the dimensions and det of a matrix
+    'safe' because it works with scalars; can add more
+    """
+    as_array = np.atleast_2d(matrix_in)
+    return (np.linalg.det(as_array), as_array.shape[0])
+
+
 def analytic_entropy_normal(covmat):
     r"""analytically find the entropy of a normal distribution"""
-    try:
-        dim = float(covmat.shape[0])
-        detval = np.linalg.det(covmat)
-    # otherwise 1-D, or scalar
-    except (IndexError, AttributeError):
-        dim = 1.
-        detval = covmat
-
+    (detval, dim) = safe_det_dim(covmat)
     # factor is 2 pi e
-    return 0.5 * np.log( 17.0794684453**dim * detval )
+    return 0.5 * np.log( 17.0794684453**float(dim) * detval )
+
+
+def multivariate_normal_distribution(mean, covmat, samples):
+    r"""Calculate the multivariate normal over a set of samples"""
+    (detval, dim) = safe_det_dim(covmat)
+    prefactor = 1. / (2. * math.pi)**(float(dim) / 2.) / math.sqrt(detval)
+
+    dvec = samples - mean
+    covinv = np.linalg.inv(covmat)
+    return prefactor * np.exp(-0.5 * np.sum(dvec * np.dot(covinv, dvec.T).T,
+                              axis=1))
 
 
 def nearest_1dfast(samples, orig_sort=True, kind="quicksort"):
@@ -96,6 +108,27 @@ def sample_entropy_nn(samples):
     result += 0.5772156649
 
     return result
+
+
+def mcintegral_entropy(samples, likelihood):
+    r"""
+    Given an appropriately-normalized likelihood, find the entropy
+
+    >>> dim = 2
+    >>> nsamp = 10000
+    >>> mean = np.zeros(dim)
+    >>> covmat = np.array([[60., 5.4],[5.4, 10.7]])
+
+    >>> samples = np.random.multivariate_normal(mean, covmat, nsamp)
+    >>> likelihood = multivariate_normal_distribution(mean, covmat, samples)
+    >>> result = mcintegral_entropy(samples, likelihood)
+    >>> result /= analytic_entropy_normal(covmat)
+    >>> np.testing.assert_almost_equal(result, 1., decimal=2)
+    """
+    nsamp = float(samples.shape[0])
+    norm = float(nsamp)
+    # MC integrand is -p ln p, so -p ln p / p
+    return (1. / norm) * np.sum(-np.log(likelihood))
 
 
 if __name__ == "__main__":

@@ -6,5 +6,6 @@ Several tools to help with MCMC outputs.
 * `plot_joint_dist.py`: tools to plot joint distributions
 * `plot_model_bands.py`: evaluate the model over the chain; plot mean and band of fluctuations
 * `relativistic_sz_fit.py`: example estimation problem
+* `chain_entropy.py`: tools to measure the entropy of outputs
 
 `emcee` and `h5py` need to be installed.
