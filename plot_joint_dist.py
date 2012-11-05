@@ -276,7 +276,7 @@ class PlotChain:
                 varcolor = self.file_info[filename][variable]['color']
                 varlstyle = self.file_info[filename][variable]['lstyle']
 
-                print variable, np.mean(var_data), varrange
+                #print variable, np.mean(var_data), varrange
                 (histo, edges) = np.histogram(var_data, bins=bins,
                                                  range=varrange,
                                                  normed=True)
@@ -371,13 +371,13 @@ class PlotChain:
         """
         pair_str = pairname((x_var, y_var))
         if pair_str in self.histo_info[fname]["histo_pairs"]:
-            print "%s %s -> %s %s" % (x_var, y_var, x_var, y_var)
+            #print "%s %s -> %s %s" % (x_var, y_var, x_var, y_var)
             histo_data = \
                 copy.deepcopy(self.histo_info[fname]["histo_pairs"][pair_str])
 
         pair_str = pairname((y_var, x_var))
         if pair_str in self.histo_info[fname]["histo_pairs"]:
-            print "%s %s -> %s %s" % (x_var, y_var, y_var, x_var)
+            #print "%s %s -> %s %s" % (x_var, y_var, y_var, x_var)
             histo_data = \
                 copy.deepcopy(self.histo_info[fname]["histo_pairs"][pair_str])
             plot_data = self.histo_info[fname]["histo_pairs"][pair_str]
@@ -400,7 +400,7 @@ class PlotChain:
 
         x_range = self.plot_info[x_var]['plot_range']
         y_range = self.plot_info[y_var]['plot_range']
-        print "x_range %s, y_range %s" % (repr(x_range), repr(y_range))
+        #print "x_range %s, y_range %s" % (repr(x_range), repr(y_range))
 
         fig = plt.figure(1, figsize=(7, 7))
 
@@ -597,18 +597,35 @@ def plot_chains(filelist, plot_options):
     r"""Given an hd5 file written by wrap_emcee, plot the joint distribution
     of all the parameters in the output chains"""
     nfiles = len(filelist)
-    if plot_options["filecolor"] is None:
-        if nfiles == 1:
-            plot_options["filecolor"] = ['black']
-        else:
-            plot_options["filecolor"] = ['green', 'blue', \
-                                         'red', 'purple', 'black']
+    if plot_options["publication"]:
+        print "using color/line style scheme for publications"
+        if plot_options["filecolor"] is None:
+            if nfiles == 1:
+                plot_options["filecolor"] = ['black']
+            else:
+                plot_options["filecolor"] = ['green', 'blue', \
+                                             'red', 'purple']
 
-    if plot_options["filelstyle"] is None:
-        if nfiles == 1:
-            plot_options["filelstyle"] = ['-']
-        else:
-            plot_options["filelstyle"] = ["-","--","-.",":"]
+        if plot_options["filelstyle"] is None:
+            plot_options["filelstyle"] = ["-", "--", "-.", ":"]
+
+    elif plot_options["grayscale"]:
+        print "using grayscale color/line style scheme"
+        if plot_options["filecolor"] is None:
+            plot_options["filecolor"] = ["0.", "0.25", "0.5", "0.75"]
+
+        if plot_options["filelstyle"] is None:
+            plot_options["filelstyle"] = ["-", "--", "-.", ":"]
+
+    else:
+        print "using color/line style scheme for screen viewing"
+        if plot_options["filecolor"] is None:
+            plot_options["filecolor"] = ['green', 'blue', \
+                                         'red', 'purple']
+
+        if plot_options["filelstyle"] is None:
+            plot_options["filelstyle"] = ["-", "-", "-", "-"]
+
 
     plot_options["filecolor"] = plot_options["filecolor"][0: nfiles]
     plot_options["filelstyle"] = plot_options["filelstyle"][0: nfiles]
@@ -721,6 +738,18 @@ def main():
                       dest="areanorm",
                       default=False,
                       help="1D histograms normalized to 1 at maximum")
+
+    parser.add_option("--grayscale",
+                      action="store_true",
+                      dest="grayscale",
+                      default=False,
+                      help="Make a grayscale-friendly plot")
+
+    parser.add_option("--publication",
+                      action="store_true",
+                      dest="publication",
+                      default=False,
+                      help="Make a color and grayscale-friendly plot")
 
     (options, args) = parser.parse_args()
     optdict = vars(options)
