@@ -133,7 +133,8 @@ class PlotChain:
                              conf_labels=conf_labels)
         self.print_params()
 
-    def register_file(self, filename, nsigma=3., rangegap=0.3, color="green"):
+    def register_file(self, filename, nsigma=3., rangegap=0.3,
+                      color="green", lstyle="-"):
         r"""Read and hd5 chain output file and populate a table with its
         range and description information
         plot options:
@@ -154,6 +155,7 @@ class PlotChain:
 
             var_info['desc'] = desc_data[varname].value
             var_info['color'] = color
+            var_info['lstyle'] = lstyle
             varname_ascii = varname.encode('ascii', 'ignore')
             plot_details[varname_ascii] = var_info
 
@@ -272,6 +274,7 @@ class PlotChain:
                 var_data *= self.plot_info[variable]['multiplier']
                 varrange = self.plot_info[variable]['plot_range']
                 varcolor = self.file_info[filename][variable]['color']
+                varlstyle = self.file_info[filename][variable]['lstyle']
 
                 print variable, np.mean(var_data), varrange
                 (histo, edges) = np.histogram(var_data, bins=bins,
@@ -285,7 +288,8 @@ class PlotChain:
                 histo_info = {"histo": histo,
                               "edges": edges,
                               "middle": middle_vec,
-                              "color": varcolor}
+                              "color": varcolor,
+                              "lstyle": varlstyle}
 
                 self.histo_info[filename]["histo_vars"][variable] = histo_info
 
@@ -295,13 +299,16 @@ class PlotChain:
                 x_data *= self.plot_info[pair[0]]['multiplier']
                 x_range = self.plot_info[pair[0]]['plot_range']
                 x_color = self.file_info[filename][pair[0]]['color']
+                x_lstyle = self.file_info[filename][pair[0]]['lstyle']
 
                 y_data = copy.deepcopy(chain_data[pair[1]].value)
                 y_data *= self.plot_info[pair[1]]['multiplier']
                 y_range = self.plot_info[pair[1]]['plot_range']
                 y_color = self.file_info[filename][pair[1]]['color']
+                y_lstyle = self.file_info[filename][pair[1]]['lstyle']
 
                 assert x_color == y_color, "colors for joint plot do not agree"
+                assert x_lstyle == y_lstyle, "line styles for joint plot do not agree"
 
                 histo_2d, xedges, yedges = np.histogram2d(x_data, y_data,
                                               bins=[xbins, ybins],
@@ -316,9 +323,9 @@ class PlotChain:
                 fmtdict = {}
                 for (clevel, conf_label) in zip(clevels, conf_labels):
                     if self.use_colormesh:
-                        linestyles.append('--')
-                    else:
                         linestyles.append('-')
+                    else:
+                        linestyles.append(x_lstyle)
                     colors.append(x_color)
                     fmtdict[clevel] = conf_label
 
@@ -455,7 +462,7 @@ class PlotChain:
             plot_data = self.histo_info[filename]["histo_vars"][x_var]
             (x_vec, histo_x) = (plot_data['middle'], plot_data['histo'])
 
-            plt.plot(x_vec, histo_x, '-', lw=3,
+            plt.plot(x_vec, histo_x, plot_data['lstyle'], lw=3,
                      color=plot_data['color'])
 
             pdf_height.append(1.1 * np.max(histo_x))
@@ -479,7 +486,7 @@ class PlotChain:
             plot_data = self.histo_info[filename]["histo_vars"][y_var]
             (y_vec, histo_y) = (plot_data['middle'], plot_data['histo'])
 
-            plt.plot(histo_y, y_vec, '-', lw=3,
+            plt.plot(histo_y, y_vec, plot_data['lstyle'], lw=3,
                      color=plot_data['color'])
 
             pdf_height.append(1.1 * np.max(histo_y))
@@ -489,12 +496,16 @@ class PlotChain:
         plt.savefig(plot_filename, format=file_format)
         #plt.show()
 
-    def plot_triangle(self, plot_filename="plot_triangle.eps",
+    def plot_triangle(self, plot_filename=None,
                       varlist=None, size_multiplier=3.,
                       color_scheme="binary",
                       file_format="eps"):
         r"""Plot the triangle of joint parameter distribution"""
+        if plot_filename is None:
+            plot_filename = "plot_triangle." + file_format
+
         print "making a joint param triangle plot: ", plot_filename
+
         if varlist is None:
             varlist = self.varlist_and
 
@@ -533,7 +544,7 @@ class PlotChain:
                         m_histo = plot_data['histo']
 
                         # can also add ls="steps"
-                        plt.plot(m_vec, m_histo, '-', lw=3,
+                        plt.plot(m_vec, m_histo, plot_data['lstyle'], lw=2,
                                  color=plot_data['color'])
 
                         pdf_height.append(1.1 * np.max(m_histo))
@@ -570,12 +581,12 @@ class PlotChain:
                                         levels=histo_data['clevels'],
                                         linestyles=histo_data['linestyles'],
                                         colors=histo_data['colors'],
-                                        linewidths=2)
+                                        linewidths=3)
 
                         # only label contours on one plot
                         if first_run:
                             plt.clabel(contours, fmt=histo_data['fmtdict'],
-                                       inline=True, fontsize=14)
+                                       inline=True, fontsize=18)
 
                             first_run = False
 
@@ -585,8 +596,6 @@ class PlotChain:
 def plot_chains(filelist, plot_options):
     r"""Given an hd5 file written by wrap_emcee, plot the joint distribution
     of all the parameters in the output chains"""
-    #   -list of hd5 files; if only one: black marginals, green contours
-    # nsigma, filecolor, meshcolor, output, file_format, separate
     nfiles = len(filelist)
     if plot_options["filecolor"] is None:
         if nfiles == 1:
@@ -595,12 +604,22 @@ def plot_chains(filelist, plot_options):
             plot_options["filecolor"] = ['green', 'blue', \
                                          'red', 'purple', 'black']
 
+    if plot_options["filelstyle"] is None:
+        if nfiles == 1:
+            plot_options["filelstyle"] = ['-']
+        else:
+            plot_options["filelstyle"] = ["-","--","-.",":"]
+
     plot_options["filecolor"] = plot_options["filecolor"][0: nfiles]
+    plot_options["filelstyle"] = plot_options["filelstyle"][0: nfiles]
 
     chain_plot = PlotChain()
     print "plot range (nsigma): ", plot_options['nsigma']
-    for (filename, color) in zip(filelist, plot_options["filecolor"]):
-        chain_plot.register_file(filename, color=color,
+    for (filename, color, lstyle) in zip(filelist,
+                                         plot_options["filecolor"],
+                                         plot_options["filelstyle"]):
+
+        chain_plot.register_file(filename, color=color, lstyle=lstyle,
                                  nsigma=plot_options['nsigma'])
 
     conf_contours = [float(confreg) for confreg in \
@@ -645,7 +664,7 @@ def main():
     parser.add_option("--nbins1d",
                       action="store",
                       dest="nbins1d",
-                      default=100,
+                      default=50,
                       help="Number of bins in 1D histogram")
 
     parser.add_option("--nbins2d",
@@ -665,6 +684,12 @@ def main():
                       dest="filecolor",
                       default=None,
                       help="List of colors for each file")
+
+    parser.add_option("--filelstyle",
+                      action="store",
+                      dest="filelstyle",
+                      default=None,
+                      help="List of line styles for each file")
 
     parser.add_option("--meshcolor",
                       action="store",
