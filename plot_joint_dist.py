@@ -106,6 +106,7 @@ class PlotChain:
     def __init__(self):
         # ranges and descriptions for variables in the chain
         self.file_info = {}
+        self.file_list = []  # keep order
         # histogram information for each file
         self.histo_info = {}
         # plot range and description for variables in common
@@ -153,6 +154,7 @@ class PlotChain:
             varname_ascii = varname.encode('ascii', 'ignore')
             plot_details[varname_ascii] = var_info
 
+        self.file_list.append(filename)
         self.file_info[filename] = plot_details
         self.histo_info[filename] = {}  # this gets filled in later
         mcmc_data.close()
@@ -182,7 +184,7 @@ class PlotChain:
         2. find the range that encloses all the common variables
         """
         # find the number of files and whether to use colormesh in plots
-        num_files = len(self.file_info)
+        num_files = len(self.file_list)
         if num_files == 0:
             print "no files have been loaded"
             sys.exit()
@@ -194,7 +196,7 @@ class PlotChain:
             print "single chain; using contours and colormesh"
             self.use_colormesh = True
 
-        for filename in self.file_info:
+        for filename in self.file_list:
             newvars = self.file_info[filename].keys()
             if self.varlist_and is None:
                 self.varlist_and = newvars
@@ -208,7 +210,7 @@ class PlotChain:
             var_info = {}
             var_info['range'] = None
             var_info['desc'] = None
-            for filename in self.file_info:
+            for filename in self.file_list:
                 range_here = self.file_info[filename][variable_name]["range"]
                 desc_here = self.file_info[filename][variable_name]["desc"]
                 if var_info['range'] is None:
@@ -246,12 +248,13 @@ class PlotChain:
                         conf_contours=None, conf_labels=None):
         r"""Read the files and make histograms over the variable pairs"""
         if conf_contours == None:
+            print "defaulting to 0.5, 0.95 enclosed"
             conf_contours = [0.5, 0.95]
 
         if conf_labels == None:
             conf_labels = ["$%d$" % int(conf * 100.) for conf in conf_contours]
 
-        for filename in self.file_info:
+        for filename in self.file_list:
             mcmc_data = h5py.File(filename, "r")
             chain_data = mcmc_data['chain']
             self.histo_info[filename]["histo_pairs"] = {}
@@ -398,7 +401,7 @@ class PlotChain:
         plt.xlim(x_range)
         plt.ylim(y_range)
         first_run = True
-        for filename in self.file_info:
+        for filename in self.file_list:
             print "adding data from ", filename
             histo_data = self.retrieve_histogram(x_var, y_var, filename)
             histo_2d = np.transpose(histo_data["histo"])
@@ -429,7 +432,7 @@ class PlotChain:
         # make the 1D marginalized x plots
         plt.subplot(subplot_grid[3])
         pdf_height = []
-        for filename in self.file_info:
+        for filename in self.file_list:
             plot_data = self.histo_info[filename]["histo_vars"][x_var]
             (x_vec, histo_x) = (plot_data['middle'], plot_data['histo'])
 
@@ -447,7 +450,7 @@ class PlotChain:
         # make the 1D marginalized x plots
         plt.subplot(subplot_grid[0])
         pdf_height = []
-        for filename in self.file_info:
+        for filename in self.file_list:
             plot_data = self.histo_info[filename]["histo_vars"][y_var]
             (y_vec, histo_y) = (plot_data['middle'], plot_data['histo'])
 
@@ -479,8 +482,10 @@ class PlotChain:
 
         plot_size = nvars * size_multiplier
         fig = plt.figure(1, figsize=(plot_size, plot_size))
-        fig.subplots_adjust(hspace=0.02, wspace=0.02, left=0.02, bottom=0.05,
-                        top=0.98, right=0.98)
+        #fig.subplots_adjust(hspace=0.02, wspace=0.02, left=0.02, bottom=0.05,
+        #                top=0.98, right=0.98)
+        fig.subplots_adjust(hspace=0.02, wspace=0.02, left=0.02, bottom=0.08,
+                            top=0.98, right=0.98)
 
         for x_ind in range(0, nvars):
             for y_ind in range(x_ind, nvars):
@@ -495,7 +500,7 @@ class PlotChain:
                     plt.xlabel(self.plot_info[m_var]["label"], fontsize=20)
                     plt.xlim(self.plot_info[m_var]["plot_range"])
                     pdf_height = []
-                    for filename in self.file_info:
+                    for filename in self.file_list:
                         plot_data = \
                             self.histo_info[filename]["histo_vars"][m_var]
                         m_vec = plot_data['middle']
@@ -517,7 +522,7 @@ class PlotChain:
                     plt.xlim(x_range)
                     plt.ylim(y_range)
                     first_run = True
-                    for filename in self.file_info:
+                    for filename in self.file_list:
                         histo_data = self.retrieve_histogram(varlist[x_ind],
                                                              varlist[y_ind],
                                                              filename)
@@ -572,18 +577,24 @@ def plot_chains(filelist, plot_options):
         chain_plot.register_file(filename, color=color,
                                  nsigma=plot_options['nsigma'])
 
+    conf_contours = [float(confreg) for confreg in \
+                     plot_options['confreg'].split(',')]
+
+    print "using confidence regions: ", conf_contours
     chain_plot.process_chain_data(xbins=plot_options['nbins2d'],
                                   ybins=plot_options['nbins2d'],
                                   bins=plot_options['nbins1d'],
-                                  conf_contours=[0.5, 0.95],
-                                  conf_labels=["$50$", "$95$"])
+                                  conf_contours=conf_contours,
+                                  conf_labels=None)
 
     if plot_options['separate']:
         chain_plot.plot_all_2d_histo(output_root=plot_options['output'],
                                      color_scheme=plot_options['meshcolor'],
                                      file_format=plot_options['file_format'])
     else:
-        chain_plot.plot_triangle(color_scheme=plot_options['meshcolor'])
+        chain_plot.plot_triangle(plot_filename=plot_options['output'],
+                                 color_scheme=plot_options['meshcolor'],
+                                 file_format=plot_options['file_format'])
 
 
 def main():
@@ -591,7 +602,6 @@ def main():
     Consider adding:
         -histeps instead of lines for 1D distributions
         -B/W friendly traces
-        -confidence contours
         -turn off confidence contour labels
     """
     parser = OptionParser(usage="usage: %prog [options] filename",
@@ -615,6 +625,12 @@ def main():
                       default=50,
                       help="Number of bins in 2D histogram")
 
+    parser.add_option("--confreg",
+                      action="store",
+                      dest="confreg",
+                      default="0.5, 0.95",
+                      help="Confidence regions (list of percentiles)")
+
     parser.add_option("--filecolor",
                       action="store",
                       dest="filecolor",
@@ -637,7 +653,7 @@ def main():
     parser.add_option("-f", "--format",
                       action="store",
                       dest="file_format",
-                      default="png",
+                      default="eps",
                       help="File format (eps/png)")
 
     parser.add_option("-s", "--separate",
