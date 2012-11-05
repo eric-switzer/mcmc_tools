@@ -117,8 +117,10 @@ class PlotChain:
         # (default is to stack root names of each registered file)
         self.basename = None
         self.use_colormesh = False
+        self.max_norm = False
 
     def process_chain_data(self, xbins=50, ybins=50, bins=100,
+                           max_norm=True,
                            conf_contours=None,
                            conf_labels=None):
         r"""perform processing steps before making plots
@@ -126,6 +128,7 @@ class PlotChain:
         # find the variables in common among several chains
         self.find_variables()
         self.find_histograms(xbins=xbins, ybins=ybins, bins=bins,
+                             max_norm=max_norm,
                              conf_contours=conf_contours,
                              conf_labels=conf_labels)
         self.print_params()
@@ -245,6 +248,7 @@ class PlotChain:
             self.plot_info[variable_name] = var_info
 
     def find_histograms(self, xbins=50, ybins=50, bins=100,
+                        max_norm=True,
                         conf_contours=None, conf_labels=None):
         r"""Read the files and make histograms over the variable pairs"""
         if conf_contours == None:
@@ -253,6 +257,8 @@ class PlotChain:
 
         if conf_labels == None:
             conf_labels = ["$%d$" % int(conf * 100.) for conf in conf_contours]
+
+        self.max_norm = max_norm
 
         for filename in self.file_list:
             mcmc_data = h5py.File(filename, "r")
@@ -271,6 +277,9 @@ class PlotChain:
                 (histo, edges) = np.histogram(var_data, bins=bins,
                                                  range=varrange,
                                                  normed=True)
+
+                if max_norm:
+                    histo /= np.max(histo)
 
                 middle_vec = 0.5 * (edges[1:] + edges[:-1])
                 histo_info = {"histo": histo,
@@ -430,7 +439,17 @@ class PlotChain:
                 first_run = False
 
         # make the 1D marginalized x plots
-        plt.subplot(subplot_grid[3])
+        ax_x = plt.subplot(subplot_grid[3])
+        plt.xticks(fontsize=16)
+        if self.max_norm:
+            plt.yticks([0., 0.25, 0.5, 0.75, 1.])
+            ax_x.set_yticklabels([])
+        else:
+            plt.yticks([])
+
+        plt.xlabel(self.plot_info[x_var]["label"], fontsize=24)
+        plt.xlim(x_range)
+
         pdf_height = []
         for filename in self.file_list:
             plot_data = self.histo_info[filename]["histo_vars"][x_var]
@@ -439,16 +458,22 @@ class PlotChain:
             plt.plot(x_vec, histo_x, '-', lw=3,
                      color=plot_data['color'])
 
-            plt.xticks(fontsize=16)
-            plt.yticks([])
-            plt.xlabel(self.plot_info[x_var]["label"], fontsize=24)
-            plt.xlim(x_range)
             pdf_height.append(1.1 * np.max(histo_x))
 
         plt.ylim(0.0, max(pdf_height))
 
-        # make the 1D marginalized x plots
-        plt.subplot(subplot_grid[0])
+        # make the 1D marginalized y plots
+        ax_y = plt.subplot(subplot_grid[0])
+        plt.yticks(fontsize=16)
+        if self.max_norm:
+            plt.xticks([0., 0.25, 0.5, 0.75, 1.])
+            ax_y.set_xticklabels([])
+        else:
+            plt.xticks([])
+
+        plt.ylabel(self.plot_info[y_var]["label"], fontsize=24)
+        plt.ylim(y_range)
+
         pdf_height = []
         for filename in self.file_list:
             plot_data = self.histo_info[filename]["histo_vars"][y_var]
@@ -457,10 +482,6 @@ class PlotChain:
             plt.plot(histo_y, y_vec, '-', lw=3,
                      color=plot_data['color'])
 
-            plt.yticks(fontsize=16)
-            plt.xticks([])
-            plt.xlabel(self.plot_info[y_var]["label"], fontsize=24)
-            plt.ylim(y_range)
             pdf_height.append(1.1 * np.max(histo_y))
 
         plt.xlim(0.0, max(pdf_height))
@@ -490,12 +511,17 @@ class PlotChain:
         for x_ind in range(0, nvars):
             for y_ind in range(x_ind, nvars):
                 print "plotting section: ", varlist[y_ind], varlist[x_ind]
-                plt.subplot2grid((nvars, nvars), (x_ind, y_ind))
+                ax = plt.subplot2grid((nvars, nvars), (x_ind, y_ind))
 
                 # if the plot is along the diagonal, plot marginalized
                 if x_ind == y_ind:
                     m_var = varlist[x_ind]
-                    plt.yticks([])
+                    if self.max_norm:
+                        plt.yticks([0., 0.25, 0.5, 0.75, 1.])
+                        ax.set_yticklabels([])
+                    else:
+                        plt.yticks([])
+
                     plt.xticks(fontsize=10)
                     plt.xlabel(self.plot_info[m_var]["label"], fontsize=20)
                     plt.xlim(self.plot_info[m_var]["plot_range"])
@@ -580,10 +606,13 @@ def plot_chains(filelist, plot_options):
     conf_contours = [float(confreg) for confreg in \
                      plot_options['confreg'].split(',')]
 
+    max_norm = not plot_options['areanorm']
+
     print "using confidence regions: ", conf_contours
     chain_plot.process_chain_data(xbins=plot_options['nbins2d'],
                                   ybins=plot_options['nbins2d'],
                                   bins=plot_options['nbins1d'],
+                                  max_norm=max_norm,
                                   conf_contours=conf_contours,
                                   conf_labels=None)
 
@@ -616,7 +645,7 @@ def main():
     parser.add_option("--nbins1d",
                       action="store",
                       dest="nbins1d",
-                      default=50,
+                      default=100,
                       help="Number of bins in 1D histogram")
 
     parser.add_option("--nbins2d",
@@ -661,6 +690,12 @@ def main():
                       dest="separate",
                       default=False,
                       help="Make separate plots for each joint var")
+
+    parser.add_option("--areanorm",
+                      action="store_true",
+                      dest="areanorm",
+                      default=False,
+                      help="1D histograms normalized to 1 at maximum")
 
     (options, args) = parser.parse_args()
     optdict = vars(options)
