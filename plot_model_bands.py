@@ -10,6 +10,37 @@ from optparse import OptionParser
 import wrap_emcee
 
 
+def print_multicolumn(*args, **kwargs):
+    """given a series of arrays of the same size as arguments, write these as
+    columns to a file (kwarg "outfile"), each with format string (kwarg format)
+    """
+    outfile = "multicolumns.dat"
+    format = "%10.15g"
+
+    if "outfile" in kwargs:
+        outfile = kwargs["outfile"]
+
+    if "format" in kwargs:
+        format = kwargs["format"]
+
+    # if there is a root directory that does not yet exist
+    rootdir = "/".join(outfile.split("/")[0:-1])
+    if len(rootdir) > 0 and rootdir != ".":
+        if not os.path.isdir(rootdir):
+            print "print_multicolumn: making dir " + rootdir
+            os.mkdir(rootdir)
+
+    numarg = len(args)
+    fmt_string = (format + " ") * numarg + "\n"
+    print "writing %d columns to file %s" % (numarg, outfile)
+
+    outfd = open(outfile, "w")
+    for column_data in zip(*args):
+        outfd.write(fmt_string % column_data)
+
+    outfd.close()
+
+
 def plot_best_fit(hd5_file_list, plot_filename="best_fit.png",
                   obs_axis_name="bands", format="png",
                   xlabel="x", ylabel="y", nobands=False,
@@ -36,8 +67,13 @@ def plot_best_fit(hd5_file_list, plot_filename="best_fit.png",
                                                nsample=nsample,
                                                threads=threads)
 
-        model_means.append(np.mean(eval_model, axis=1))
-        model_stdevs.append(np.std(eval_model, axis=1))
+        mean_curve = np.mean(eval_model, axis=1)
+        std_curve = np.std(eval_model, axis=1)
+        print_multicolumn(obs_axis, mean_curve, std_curve,
+                          outfile=filename + ".avg_model")
+
+        model_means.append(mean_curve)
+        model_stdevs.append(std_curve)
         meas_means.append(mcmc_params['meas_means'].value)
         meas_stdevs.append(mcmc_params['meas_cov'].value)
         meas_axes.append(mcmc_defaults[obs_axis_name].value)
