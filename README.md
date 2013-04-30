@@ -9,3 +9,12 @@ Several tools to help with MCMC outputs.
 * `chain_entropy.py`: tools to measure the entropy of outputs
 
 `emcee` and `h5py` need to be installed.
+
+TODO:
+* smoothed posterior dists (2d, 1d)
+* log axes
+* plotting lines at fixed parameter values
+
+Used by (at least):
+* `http://arxiv.org/abs/1211.3206` Sunyaev-Zeldovich signal processing and temperature-velocity moment method for individual clusters
+* `http://arxiv.org/abs/1304.6121` Distinguishing different scenarios of early energy release with spectral distortions of the cosmic microwave background
